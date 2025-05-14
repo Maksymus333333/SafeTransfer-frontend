@@ -46,8 +46,6 @@
   "devDependencies": {
     "@eslint/js": "^9.20.0",
     "@svgr/webpack": "^8.1.0",
-    "@types/react": "^19.1.4",
-    "@types/react-dom": "^19.1.5",
     "@types/react-svg": "^3.0.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.0.1",
