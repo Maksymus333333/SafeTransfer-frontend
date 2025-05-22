@@ -1,6 +1,6 @@
 import { JSX } from 'react/jsx-runtime';
-import './styles/styles.css';
+import { Header } from '../../modules/Header';
 
 export const LandingPage = (): JSX.Element => {
-  return <div> Hello</div>;
+  return <Header />;
 };
