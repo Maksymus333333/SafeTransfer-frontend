@@ -1,0 +1,47 @@
+.metamask-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  min-height: 100vh;
+}
+
+.metamask-card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 40px;
+  background: white;
+  text-align: center;
+  border-radius: 5px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+  flex-direction: column;
+  gap: 30px;
+  max-width: 400px;
+}
+
+.metamask-title {
+  color: #333;
+  font-size: 32px;
+}
+
+.metamask-subtitle {
+  color: #666;
+  font-size: 20px;
+}
+
+.metamask-button {
+  width: 100px;
+  padding: 10px 20px;
+  border: none;
+  color: #fff;
+  transition: background-color 0.3s ease;
+  background-color: blue;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.metamask-button:hover {
+  background-color: rgb(0 0 124);
+}
