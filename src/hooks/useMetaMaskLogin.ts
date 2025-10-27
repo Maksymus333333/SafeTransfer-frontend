@@ -1,40 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getMe, getNonce, verifySiwe } from '../global/api/authApi';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'ethers';
-import Cookies from 'js-cookie';
 import { NavigateFunction } from 'react-router-dom';
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ethereum?: any;
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
   }
 }
 
 export const useMetaMaskLogin = (navigate: NavigateFunction) => {
-  const [nonce, setNonce] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const debugLog = (...args: unknown[]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[MetaMaskLogin]', ...args);
-    }
+    if (process.env.NODE_ENV === 'development') console.log('[MetaMaskLogin]', ...args);
   };
-
-  useEffect(() => {
-    const fetchNonce = async () => {
-      try {
-        const { nonce } = await getNonce();
-        setNonce(nonce);
-        debugLog('Nonce:', nonce);
-      } catch (error) {
-        console.error('Failed to get nonce:', error);
-      }
-    };
-
-    fetchNonce();
-  }, []);
 
   const login = async () => {
     if (!window.ethereum) {
@@ -45,13 +29,22 @@ export const useMetaMaskLogin = (navigate: NavigateFunction) => {
     setLoading(true);
 
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      // 1. Отримуємо новий nonce перед кожним логіном
+      const { nonce } = await getNonce();
+      debugLog('Fetched nonce:', nonce);
+
+      // 2. Отримуємо адресу користувача
+      const accounts = (await window.ethereum.request({ method: 'eth_requestAccounts' })) as string[];
+      if (!accounts || accounts.length === 0) throw new Error('No Ethereum accounts found.');
       const address = getAddress(accounts[0]);
-      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      debugLog('User address:', address);
+
+      // 3. Отримуємо chainId
+      const chainIdHex = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
       const chainId = parseInt(chainIdHex, 16);
+      debugLog('Chain ID:', chainId);
 
-      if (!nonce) throw new Error('Nonce is missing');
-
+      // 4. Створюємо SIWE повідомлення
       const siwe = new SiweMessage({
         domain: window.location.host,
         address,
@@ -61,28 +54,33 @@ export const useMetaMaskLogin = (navigate: NavigateFunction) => {
         chainId,
         nonce,
       });
-
       const messageToSign = siwe.prepareMessage();
 
-      const signature = await window.ethereum.request({
+      // 5. Підписуємо повідомлення через MetaMask
+      const signature = (await window.ethereum.request({
         method: 'personal_sign',
         params: [messageToSign, address],
-      });
+      })) as string;
+      debugLog('SIWE message:', messageToSign);
+      debugLog('Signature:', signature, 'length:', signature.length);
 
-      debugLog('SIWE Message:', messageToSign);
-      debugLog('Signature:', signature);
+      // 6. Верифікуємо підпис на бекенді
+      await verifySiwe(messageToSign, signature);
 
-      const { access_token } = await verifySiwe(messageToSign, signature);
-
-      Cookies.set('access_token', access_token, { expires: 7, secure: true });
-
-      const user = await getMe(access_token);
+      // 7. Отримуємо дані користувача
+      const user = await getMe();
       debugLog('Logged in user:', user);
 
+      // 8. Перехід на головну сторінку
       navigate('/');
-    } catch (error) {
-      console.error('MetaMask login error:', error);
-      alert('Login failed. Please try again.');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('MetaMask login error:', error.message);
+        alert(`Login failed: ${error.message}`);
+      } else {
+        console.error('MetaMask login error:', error);
+        alert('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
