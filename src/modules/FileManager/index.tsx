@@ -86,7 +86,7 @@ export const FileManager: React.FC = () => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
       const formData = new FormData();
-      formData.append('encrypted_file', new Blob([encryptedFile], { type: file.type }));
+      formData.append('encrypted_file', new Blob([encryptedFile], { type: file.type }), file.name);
       formData.append('encrypted_aes_key', encryptedAesKeyString);
       formData.append('iv', ivHex);
       formData.append('original_file_hash', fileHashHex);
