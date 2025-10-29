@@ -68,6 +68,7 @@ export const useMetaMaskLogin = (navigate: NavigateFunction) => {
       await verifySiwe(messageToSign, signature);
 
       // 7. Отримуємо дані користувача
+
       const user = await getMe();
       debugLog('Logged in user:', user);
 
