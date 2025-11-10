@@ -1,15 +1,16 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useAuth } from '../../context/AuthContext';
 import { encrypt as ethEncrypt } from '@metamask/eth-sig-util';
+import '../../hooks/useMetaMaskLogin';
+
+import { useAuth } from '../../context/AuthContext';
 
 interface FileInfo {
   fileId: string;
   ipfsCid: string;
   originalFileHash: string;
-  fileName: string;
+  fileName?: string;
 }
 
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -39,118 +40,147 @@ export const FileManager: React.FC = () => {
 
   if (!isAuthenticated) return <p>You need to log in</p>;
 
-  const handleFileSelect = async (file: File) => {
-    setSelectedFile(file);
-    setStatus('⚙️ File selected. Generating AES key and encrypting...');
-    await uploadFile(file);
-  };
-
+  // ---------- UPLOAD ----------
   const uploadFile = async (file: File) => {
     try {
       setStatus('🔐 Preparing encryption...');
 
+      // 1) Generate AES key + IV
       const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
       const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
-      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const iv = crypto.getRandomValues(new Uint8Array(16));
 
+      // 2) Encrypt file with AES-GCM
       const fileData = await file.arrayBuffer();
       setStatus('🔐 Encrypting file...');
-      const encryptedFile = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileData);
+      const encryptedFileBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileData);
 
-      const hashBuffer = await crypto.subtle.digest('SHA-256', fileData);
-      const fileHashHex = Array.from(new Uint8Array(hashBuffer))
+      // 3) SHA-256 of original file
+      const hashBuf = await crypto.subtle.digest('SHA-256', fileData);
+      const fileHashHex = Array.from(new Uint8Array(hashBuf))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
-      if (!(window as any).ethereum) {
-        setStatus('❌ MetaMask not found.');
-        return;
-      }
+      // 4) Request MetaMask public key
+      if (!(window as any).ethereum) throw new Error('MetaMask not available');
       const eth = (window as any).ethereum;
-
-      setStatus('🔑 Requesting public key from MetaMask...');
+      setStatus('🔑 Requesting encryption public key from MetaMask...');
       const encryptionPublicKey = await eth.request({
         method: 'eth_getEncryptionPublicKey',
         params: [user?.address],
       });
 
-      setStatus('🔐 Encrypting AES key...');
+      // 5) Encrypt AES key using MetaMask public key
+      setStatus('🔐 Encrypting AES key with MetaMask public key...');
       const encResult = ethEncrypt({
         publicKey: encryptionPublicKey,
         data: arrayBufferToBase64(rawKey.buffer),
         version: 'x25519-xsalsa20-poly1305',
       });
-      const encryptedAesKeyString = btoa(JSON.stringify(encResult));
+      const encryptedAesKeyForBackend = btoa(JSON.stringify(encResult));
 
+      // 6) Convert IV to hex
       const ivHex = Array.from(iv)
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
+
+      // 7) Upload to backend
       const formData = new FormData();
-      formData.append('encrypted_file', new Blob([encryptedFile], { type: file.type }), file.name);
-      formData.append('encrypted_aes_key', encryptedAesKeyString);
+      formData.append('encrypted_file', new Blob([encryptedFileBuf], { type: file.type }), file.name);
+      formData.append('encrypted_aes_key', encryptedAesKeyForBackend);
       formData.append('iv', ivHex);
       formData.append('original_file_hash', fileHashHex);
 
-      setStatus('📤 Uploading...');
+      setStatus('📤 Uploading to server...');
       await axios.post('http://localhost:8000/api/v1/files/upload', formData, {
         withCredentials: true,
         headers: { Accept: 'application/json' },
       });
 
-      setStatus('✅ File uploaded successfully');
+      setStatus('✅ File uploaded!');
       setSelectedFile(null);
       fetchMyFiles();
-    } catch (err: any) {
-      console.error('Upload error:', err);
-      setStatus('❌ Upload error: ' + (err.response?.data?.detail || err.message));
+    } catch (e: any) {
+      console.error(e);
+      setStatus('❌ Upload error: ' + (e.response?.data?.detail || e.message));
     }
   };
 
+  // ---------- FETCH ----------
   const fetchMyFiles = async () => {
     try {
-      const resp = await axios.get('http://localhost:8000/api/v1/files/my', {
+      const resp = await axios.get<FileInfo[]>('http://localhost:8000/api/v1/files/my', {
         withCredentials: true,
       });
-
-      const mappedFiles: FileInfo[] = resp.data.map((f: any) => ({
-        fileId: f.fileId,
-        ipfsCid: f.ipfsCid,
-        originalFileHash: f.originalFileHash,
-        fileName: f.ipfsCid,
-      }));
-      setFiles(mappedFiles);
-    } catch (err) {
-      console.error('Fetch files error:', err);
+      setFiles(resp.data);
+    } catch (e) {
+      console.error('Fetch files error:', e);
     }
   };
 
-  const downloadFile = async (file: FileInfo) => {
+  // ---------- DOWNLOAD + DECRYPT ----------
+  const downloadAndDecrypt = async (f: FileInfo) => {
     try {
-      setStatus('⏳ Fetching file...');
-      const resp = await axios.get(`http://localhost:8000/api/v1/files/${file.fileId}/download-info`, {
+      setStatus('⏳ Requesting download info...');
+      const resp = await axios.get(`http://localhost:8000/api/v1/files/${f.fileId}/download-info`, {
         withCredentials: true,
       });
+      const { encryptedFileData, encryptedAesKey, iv } = resp.data;
 
-      const { encryptedAesKey, encryptedFileData, iv } = resp.data;
+      //   window.ethereum
+      const eth = window.ethereum;
+      if (!eth) {
+        throw new Error('MetaMask not available');
+      }
 
-      const eth = (window as any).ethereum;
-      const encObjJson = atob(encryptedAesKey);
-      const encObj = JSON.parse(encObjJson);
-      const cipherTextBase64 = btoa(JSON.stringify(encObj));
-      const decryptedKeyB64 = await eth.request({ method: 'eth_decrypt', params: [cipherTextBase64, user?.address] });
+      const accounts = (await eth.request({ method: 'eth_requestAccounts' })) as string[];
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No MetaMask account connected');
+      }
+
+      const userAddress = accounts[0];
+      const publicKey = (await eth.request({
+        method: 'eth_getEncryptionPublicKey',
+        params: [userAddress],
+      })) as string;
+
+      console.log('🔑 encryption publicKey for', userAddress, ':', publicKey);
+      console.log('RAW encryptedAesKey (from backend):', encryptedAesKey);
+
+      try {
+        const base64Decoded = atob(encryptedAesKey);
+        console.log('base64Decoded (string):', base64Decoded.slice(0, 200));
+        const encJson = JSON.parse(base64Decoded);
+        console.log('encJson object:', encJson);
+      } catch (err) {
+        console.error('Failed to parse encryptedAesKey:', err);
+      }
+
+      setStatus('🔑 Requesting MetaMask to decrypt AES key...');
+      const encJson = JSON.parse(atob(encryptedAesKey));
+
+      console.log('🔍 trying to decrypt with address', userAddress);
+      console.log('🔍 payload:', JSON.stringify(encJson));
+
+      const jsonString = JSON.stringify(JSON.parse(atob(encryptedAesKey)));
+      const decryptedKeyB64 = (await eth.request({
+        method: 'eth_decrypt',
+        params: [jsonString, userAddress],
+      })) as string;
 
       const rawAesKeyBuf = base64ToArrayBuffer(decryptedKeyB64);
       const aesKey = await crypto.subtle.importKey('raw', rawAesKeyBuf, 'AES-GCM', true, ['decrypt']);
-
       const encryptedFileBuf = base64ToArrayBuffer(encryptedFileData);
       const ivBytes = Uint8Array.from(iv.match(/.{2}/g)!.map((h: string) => parseInt(h, 16)));
-      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, encryptedFileBuf);
 
-      const blob = new Blob([decrypted]);
+      setStatus('🔓 Decrypting file...');
+      const decryptedBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, encryptedFileBuf);
+
+      const blob = new Blob([decryptedBuf], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = file.fileName;
+      a.download = f.fileName ?? f.ipfsCid;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -164,19 +194,20 @@ export const FileManager: React.FC = () => {
   return (
     <div>
       {user && <p>User: {user.address}</p>}
-      <h2>File Manager (AES-GCM + MetaMask)</h2>
+      <h2>SafeTransfer — Upload & Decrypt via MetaMask</h2>
 
-      <input type="file" onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])} />
-
+      <input type="file" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
+      <button disabled={!selectedFile} onClick={() => selectedFile && uploadFile(selectedFile)}>
+        Upload
+      </button>
       <p>{status}</p>
 
       <h3>My files</h3>
       <ul>
         {files.map((f) => (
           <li key={f.fileId}>
-            <strong>IPFS:</strong> {f.ipfsCid} <br />
-            <small>Hash: {f.originalFileHash}</small> <br />
-            <button onClick={() => downloadFile(f)}>Download & Decrypt</button>
+            IPFS: {f.ipfsCid} — Hash: {f.originalFileHash}
+            <button onClick={() => downloadAndDecrypt(f)}>Download & Decrypt</button>
           </li>
         ))}
       </ul>

@@ -8,7 +8,24 @@ module.exports = {
         zlib: require.resolve('browserify-zlib'),
         stream: require.resolve('stream-browserify'),
       };
+
+      webpackConfig.ignoreWarnings = [
+        {
+          module: /superstruct/,
+        },
+      ];
+
       return webpackConfig;
     },
+  },
+
+  devServer: (devServerConfig) => {
+    devServerConfig.client = {
+      overlay: {
+        warnings: false,
+        errors: true,
+      },
+    };
+    return devServerConfig;
   },
 };
