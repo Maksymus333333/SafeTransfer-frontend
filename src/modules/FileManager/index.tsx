@@ -1,16 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { encrypt as ethEncrypt } from '@metamask/eth-sig-util';
-import '../../hooks/useMetaMaskLogin';
-
 import { useAuth } from '../../context/AuthContext';
+import './styles/styles.css';
+import UploadIcon from '../../assets/icons/UploadIcon';
+import { ReactComponent as FoxIcon } from '../../assets/icons/FoxIcon.svg';
+import FileIcon from '../../assets/icons/FileIconn.png';
 
 interface FileInfo {
   fileId: string;
   ipfsCid: string;
   originalFileHash: string;
-  fileName?: string;
+  filename?: string;
 }
 
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -30,15 +32,51 @@ const base64ToArrayBuffer = (base64: string) => {
 
 export const FileManager: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [status, setStatus] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isAuthenticated) fetchMyFiles();
   }, [isAuthenticated]);
 
-  if (!isAuthenticated) return <p>You need to log in</p>;
+  const handleFileSelect = (file: File | null) => {
+    if (file) {
+      uploadFile(file);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation(); // Necessary to allow drop
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
 
   // ---------- UPLOAD ----------
   const uploadFile = async (file: File) => {
@@ -87,6 +125,7 @@ export const FileManager: React.FC = () => {
       // 7) Upload to backend
       const formData = new FormData();
       formData.append('encrypted_file', new Blob([encryptedFileBuf], { type: file.type }), file.name);
+      formData.append('file_name', file.name);
       formData.append('encrypted_aes_key', encryptedAesKeyForBackend);
       formData.append('iv', ivHex);
       formData.append('original_file_hash', fileHashHex);
@@ -98,7 +137,6 @@ export const FileManager: React.FC = () => {
       });
 
       setStatus('✅ File uploaded!');
-      setSelectedFile(null);
       fetchMyFiles();
     } catch (e: any) {
       console.error(e);
@@ -162,7 +200,7 @@ export const FileManager: React.FC = () => {
       console.log('🔍 trying to decrypt with address', userAddress);
       console.log('🔍 payload:', JSON.stringify(encJson));
 
-      const jsonString = JSON.stringify(JSON.parse(atob(encryptedAesKey)));
+      const jsonString = atob(encryptedAesKey);
       const decryptedKeyB64 = (await eth.request({
         method: 'eth_decrypt',
         params: [jsonString, userAddress],
@@ -180,7 +218,7 @@ export const FileManager: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = f.fileName ?? f.ipfsCid;
+      a.download = f.filename ?? f.ipfsCid;
       a.click();
       URL.revokeObjectURL(url);
 
@@ -192,25 +230,50 @@ export const FileManager: React.FC = () => {
   };
 
   return (
-    <div>
-      {user && <p>User: {user.address}</p>}
-      <h2>SafeTransfer — Upload & Decrypt via MetaMask</h2>
+    <div className="file-manager-container">
+      <div
+        className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={(e) => handleFileSelect(e.target.files ? e.target.files[0] : null)}
+          style={{ display: 'none' }}
+        />
+        <button className="upload-button" onClick={handleButtonClick}>
+          <UploadIcon />
+          <span>Upload File</span>
+        </button>
+        <p className="upload-prompt">To upload a file, drag it here or click the button</p>
+      </div>
 
-      <input type="file" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
-      <button disabled={!selectedFile} onClick={() => selectedFile && uploadFile(selectedFile)}>
-        Upload
-      </button>
-      <p>{status}</p>
+      {user && (
+        <div className="user-info">
+          <FoxIcon className="fox-icon" />
+          <p>
+            Your wallet: <span>{user.address}</span>
+          </p>
+        </div>
+      )}
 
-      <h3>My files</h3>
-      <ul>
-        {files.map((f) => (
-          <li key={f.fileId}>
-            IPFS: {f.ipfsCid} — Hash: {f.originalFileHash}
-            <button onClick={() => downloadAndDecrypt(f)}>Download & Decrypt</button>
-          </li>
-        ))}
-      </ul>
+      <div className="file-list-container">
+        {files.length > 0 && <h2 className="file-list-title">Uploaded files</h2>}
+        <div className="file-list">
+          {files.map((f) => (
+            <div key={f.fileId} className="file-item">
+              <img src={FileIcon} alt="File" className="file-icon" />
+              <span className="file-name">{f.filename || 'Unnamed file'}</span>
+              <button className="download-button" onClick={() => downloadAndDecrypt(f)}>
+                Download
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      {status && <p className="status-message">{status}</p>}
     </div>
   );
 };

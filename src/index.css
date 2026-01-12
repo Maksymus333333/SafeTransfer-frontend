@@ -5,7 +5,7 @@
 }
 
 body {
-  background-color: #f5f6f7;
+  background-color: #121212;
   font-family: Mulish, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -20,6 +20,6 @@ button {
 }
 
 a {
-  color: #000;
+  color: #000000;
   text-decoration: none;
 }
