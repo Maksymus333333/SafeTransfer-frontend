@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { addFileOnChain, verifyFileOnChain } from '../Blockchain';
 import UploadIcon from '../../assets/icons/UploadIcon';
 import FoxIcon from '../../assets/icons/FoxIcon.svg';
-import FileIcon from '../../assets/icons/FileIconn.png';
+import FileIcon from '../../assets/icons/FileIconn.svg';
 import './styles/styles.css';
 
 interface FileInfo {

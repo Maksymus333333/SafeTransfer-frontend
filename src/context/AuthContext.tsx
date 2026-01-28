@@ -82,7 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const user: User = await getMe();
         setUser(user);
-      } catch {/* empty */}
+      } catch {
+        /* empty */
+      }
     };
 
     checkAuth();
