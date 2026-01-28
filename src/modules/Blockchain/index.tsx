@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BrowserProvider, Contract } from 'ethers';
 
 const CONTRACT_ADDRESS = '0x55EE4E217290854c3285a6725C97748c04Ee3246';
@@ -52,7 +53,6 @@ export const getSigner = async () => {
   return await provider.getSigner();
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getContract = (signerOrProvider: any) => {
   return new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signerOrProvider);
 };
@@ -71,6 +71,5 @@ export const verifyFileOnChain = async (fileHashHex: string) => {
   const address = await signer.getAddress();
   const contract = getContract(provider);
   const records = await contract.getFilesByOwner(address);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return records.some((r: any) => r.originalFileHash === '0x' + fileHashHex);
 };

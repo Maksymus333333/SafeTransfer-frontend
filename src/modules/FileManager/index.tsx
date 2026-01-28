@@ -1,8 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { addFileOnChain, verifyFileOnChain } from '../Blockchain';
+import UploadIcon from '../../assets/icons/UploadIcon';
+import FoxIcon from '../../assets/icons/FoxIcon.svg';
+import FileIcon from '../../assets/icons/FileIconn.svg';
+import './styles/styles.css';
 
 interface FileInfo {
   fileId: string;
@@ -29,17 +33,52 @@ const base64ToArrayBuffer = (base64: string) => {
 
 export const FileManager: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [status, setStatus] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isAuthenticated) fetchMyFiles();
   }, [isAuthenticated]);
 
-  if (!isAuthenticated) return <p>You need to log in</p>;
+  const handleFileSelect = (file: File | null) => {
+    if (file) {
+      uploadFile(file);
+    }
+  };
 
-  // ---------- UPLOAD FILE ----------
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files[0]);
+      e.dataTransfer.clearData();
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const uploadFile = async (file: File) => {
     try {
       setStatus('🔐 Generating AES key and IV...');
@@ -74,11 +113,8 @@ export const FileManager: React.FC = () => {
 
       setStatus('✅ File uploaded. Registering on blockchain...');
 
-      // 3️⃣ blockchain
       await addFileOnChain(uploadedFile.ipfsCid, fileHashHex);
       setStatus('✅ File registered on Sepolia blockchain');
-
-      setSelectedFile(null);
 
       setFiles((prev) => [...prev, uploadedFile]);
     } catch (err: any) {
@@ -87,7 +123,6 @@ export const FileManager: React.FC = () => {
     }
   };
 
-  // ---------- FETCH FILES ----------
   const fetchMyFiles = async () => {
     try {
       const resp = await axios.get<FileInfo[]>('http://localhost:8000/api/v1/files/my', { withCredentials: true });
@@ -98,7 +133,6 @@ export const FileManager: React.FC = () => {
     }
   };
 
-  // ---------- DOWNLOAD & DECRYPT ----------
   const downloadAndDecrypt = async (f: FileInfo) => {
     try {
       setStatus('⏳ Downloading encrypted file...');
@@ -146,25 +180,56 @@ export const FileManager: React.FC = () => {
   };
 
   return (
-    <div>
-      {user && <p>User: {user.address}</p>}
-      <h2>File Manager — client-side AES encryption + Sepolia</h2>
+    <div className="file-manager-container">
+      {user && (
+        <div className="user-info">
+          <img src={FoxIcon} alt="MetaMask" className="fox-icon" />
+          <p>
+            Connected: <span>{user.address}</span>
+          </p>
+        </div>
+      )}
 
-      <input type="file" onChange={(e) => e.target.files && setSelectedFile(e.target.files[0])} />
-      <button disabled={!selectedFile} onClick={() => selectedFile && uploadFile(selectedFile)}>
-        Upload (encrypt client-side)
-      </button>
-      <p>{status}</p>
+      <div
+        className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={handleButtonClick}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+        />
+        <button className="upload-button" type="button">
+          <UploadIcon />
+          Upload File
+        </button>
+        <p className="upload-prompt">or drag and drop your file here</p>
+      </div>
 
-      <h3>My files</h3>
-      <ul>
-        {files.map((f) => (
-          <li key={f.fileId}>
-            {f.filename} — Hash: {f.originalFileHash}
-            <button onClick={() => downloadAndDecrypt(f)}>Download & Decrypt</button>
-          </li>
-        ))}
-      </ul>
+      {status && <p className="status-message">{status}</p>}
+
+      <div className="file-list-container">
+        <h3 className="file-list-title">My Files</h3>
+        <div className="file-list">
+          {files.length === 0 ? (
+            <p className="status-message">No files uploaded yet</p>
+          ) : (
+            files.map((f) => (
+              <div key={f.fileId} className="file-item">
+                <img src={FileIcon} alt="file" className="file-icon" />
+                <span className="file-name">{f.filename || f.ipfsCid}</span>
+                <button className="download-button" onClick={() => downloadAndDecrypt(f)}>
+                  Download
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };

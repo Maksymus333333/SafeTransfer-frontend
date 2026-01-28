@@ -1,0 +1,141 @@
+.file-manager-container {
+  padding: 40px;
+  max-width: 900px;
+  margin: 120px auto;
+  background-color: #1a1a1a;
+  border-radius: 16px;
+  color: #e6eef5;
+}
+
+.upload-zone {
+  border: 2px dashed #3a3a3a;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color 0.3s,
+    border-color 0.3s;
+  margin-bottom: 30px;
+}
+
+.upload-zone.dragging {
+  background-color: #2a2a2a;
+  border-color: #00f5a0;
+}
+
+.upload-button {
+  background-color: #00f5a0;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.3s;
+}
+
+.upload-button:hover {
+  background-color: #019561;
+}
+
+.upload-prompt {
+  margin-top: 15px;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #232323;
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+.fox-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.user-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #a0a0a0;
+}
+
+.user-info span {
+  font-weight: bold;
+  color: #e0e0e0;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.file-list-container {
+  margin-top: 20px;
+}
+
+.file-list-title {
+  color: #e0e0e0;
+  margin-bottom: 20px;
+  font-size: 22px;
+  border-bottom: 1px solid #3a3a3a;
+  padding-bottom: 10px;
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  background-color: #232323;
+  padding: 15px;
+  border-radius: 8px;
+  transition: background-color 0.3s;
+}
+
+.file-item:hover {
+  background-color: #2c2c2c;
+}
+
+.file-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 15px;
+}
+
+.file-name {
+  flex-grow: 1;
+  color: #c0c0c0;
+  font-size: 16px;
+}
+
+.download-button {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.download-button:hover {
+  background-color: #4a4a4a;
+}
+
+.status-message {
+  margin-top: 20px;
+  text-align: center;
+  color: #8c8c8c;
+}
