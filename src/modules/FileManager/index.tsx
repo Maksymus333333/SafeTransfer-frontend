@@ -37,6 +37,7 @@ export const FileManager: React.FC = () => {
   const [status, setStatus] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) fetchMyFiles();
@@ -81,11 +82,12 @@ export const FileManager: React.FC = () => {
 
   const uploadFile = async (file: File) => {
     try {
-      setStatus('🔐 Generating AES key and IV...');
+      setIsLoading(true);
+      setStatus('Generating AES key and IV...');
       const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
       const iv = crypto.getRandomValues(new Uint8Array(12));
 
-      setStatus('🔐 Encrypting file...');
+      setStatus('Encrypting file...');
       const fileData = await file.arrayBuffer();
       const encryptedBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileData);
 
@@ -94,7 +96,7 @@ export const FileManager: React.FC = () => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
-      setStatus('📤 Uploading encrypted file to server...');
+      setStatus('Uploading encrypted file to server...');
       const form = new FormData();
       form.append('encrypted_file', new Blob([encryptedBuf], { type: file.type }), file.name);
       form.append('file_type', file.type);
@@ -104,22 +106,27 @@ export const FileManager: React.FC = () => {
       const exportedKey = await crypto.subtle.exportKey('raw', aesKey);
       form.append('encrypted_aes_key', arrayBufferToBase64(exportedKey));
 
-      const resp = await axios.post('https://safetransfer.myftp.org/api/v1/files/upload', form, {
+      await axios.post('https://safetransfer.myftp.org/api/v1/files/upload', form, {
         withCredentials: true,
         headers: { Accept: 'application/json' },
       });
 
-      const uploadedFile: FileInfo = resp.data;
+      setStatus('File uploaded. Registering on blockchain...');
+      await addFileOnChain(fileHashHex, fileHashHex);
 
-      setStatus('✅ File uploaded. Registering on blockchain...');
+      const resp = await axios.get<FileInfo[]>('https://safetransfer.myftp.org/api/v1/files/my', {
+        withCredentials: true,
+      });
 
-      await addFileOnChain(uploadedFile.ipfsCid, fileHashHex);
-      setStatus('✅ File registered on Sepolia blockchain');
+      const lastFile = resp.data[resp.data.length - 1];
+      setFiles((prev) => [...prev, lastFile]);
 
-      setFiles((prev) => [...prev, uploadedFile]);
+      setStatus('File registered and added to list');
     } catch (err: any) {
       console.error('Upload error:', err);
-      setStatus('❌ Upload error: ' + (err.response?.data?.detail || err.message || String(err)));
+      setStatus('Upload error: ' + (err.response?.data?.detail || err.message || String(err)));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -131,19 +138,19 @@ export const FileManager: React.FC = () => {
       setFiles(resp.data);
     } catch (e) {
       console.error('Fetch files error:', e);
-      setStatus('❌ Fetch files error');
+      setStatus(' Fetch files error');
     }
   };
 
   const downloadAndDecrypt = async (f: FileInfo) => {
     try {
-      setStatus('⏳ Downloading encrypted file...');
+      setStatus('Downloading encrypted file...');
 
       const isNewFile = f.ipfsCid === files[files.length - 1]?.ipfsCid;
 
       if (!isNewFile) {
         const hashOk = await verifyFileOnChain(f.originalFileHash);
-        if (!hashOk) throw new Error('❌ File hash mismatch. Cannot download.');
+        if (!hashOk) throw new Error('File hash mismatch. Cannot download.');
       }
 
       const resp = await axios.get(`https://safetransfer.myftp.org/api/v1/files/${f.fileId}/download-info`, {
@@ -163,7 +170,7 @@ export const FileManager: React.FC = () => {
 
       const encryptedBuf = base64ToArrayBuffer(encryptedFileData);
 
-      setStatus('🔓 Decrypting file...');
+      setStatus('Decrypting file...');
       const decryptedBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, encryptedBuf);
 
       const blob = new Blob([decryptedBuf], { type: f.contentType ?? 'application/octet-stream' });
@@ -174,10 +181,10 @@ export const FileManager: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
 
-      setStatus('✅ File decrypted and downloaded');
+      setStatus('File decrypted and downloaded');
     } catch (err: any) {
       console.error(err);
-      setStatus('❌ Download error: ' + (err.response?.data?.detail || err.message || String(err)));
+      setStatus('Download error: ' + (err.response?.data?.detail || err.message || String(err)));
     }
   };
 
@@ -212,7 +219,17 @@ export const FileManager: React.FC = () => {
         <p className="upload-prompt">or drag and drop your file here</p>
       </div>
 
-      {status && <p className="status-message">{status}</p>}
+      {status && (
+        <p className="status-message">
+          {isLoading ? (
+            <>
+              <span className="spinner"></span> {status}...
+            </>
+          ) : (
+            <span>{status}</span>
+          )}
+        </p>
+      )}
 
       <div className="file-list-container">
         <h3 className="file-list-title">My Files</h3>
