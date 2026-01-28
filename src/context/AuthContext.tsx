@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { getMe, User, getNonce, verifySiwe, logoutApi } from '../global/api/authApi';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +20,15 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   setUser: () => {},
 });
+
+export const SEPILIA_CHAIN_ID = '0xaa36a7';
+export const SEPILIA_PARAMS = {
+  chainId: SEPILIA_CHAIN_ID,
+  chainName: 'Sepolia Test Network',
+  nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
+  rpcUrls: ['https://rpc.sepolia.org'],
+  blockExplorerUrls: ['https://sepolia.etherscan.io'],
+};
 
 export const useAuth = () => useContext(AuthContext);
 

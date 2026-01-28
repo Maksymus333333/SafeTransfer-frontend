@@ -44,50 +44,33 @@ export const FileManager: React.FC = () => {
   }, [isAuthenticated]);
 
   const handleFileSelect = (file: File | null) => {
-    if (file) {
-      uploadFile(file);
-    }
+    if (file) uploadFile(file);
   };
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragging(true);
   };
-
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragging(false);
   };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => e.preventDefault();
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileSelect(e.dataTransfer.files[0]);
-      e.dataTransfer.clearData();
-    }
+    if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
   };
-
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleButtonClick = () => fileInputRef.current?.click();
 
   const uploadFile = async (file: File) => {
     try {
       setIsLoading(true);
-      setStatus('Generating AES key and IV...');
+      setStatus('Encrypting file and generating hash...');
+
       const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
       const iv = crypto.getRandomValues(new Uint8Array(12));
 
-      setStatus('Encrypting file...');
       const fileData = await file.arrayBuffer();
       const encryptedBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileData);
 
@@ -96,7 +79,11 @@ export const FileManager: React.FC = () => {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
-      setStatus('Uploading encrypted file to server...');
+      setStatus('Submitting transaction to blockchain...');
+
+      await addFileOnChain(fileHashHex, fileHashHex);
+
+      setStatus('Transaction confirmed. Uploading file to server...');
       const form = new FormData();
       form.append('encrypted_file', new Blob([encryptedBuf], { type: file.type }), file.name);
       form.append('file_type', file.type);
@@ -111,20 +98,23 @@ export const FileManager: React.FC = () => {
         headers: { Accept: 'application/json' },
       });
 
-      setStatus('File uploaded. Registering on blockchain...');
-      await addFileOnChain(fileHashHex, fileHashHex);
-
       const resp = await axios.get<FileInfo[]>('https://safetransfer.myftp.org/api/v1/files/my', {
         withCredentials: true,
       });
-
       const lastFile = resp.data[resp.data.length - 1];
       setFiles((prev) => [...prev, lastFile]);
 
-      setStatus('File registered and added to list');
+      setStatus('File successfully uploaded and registered on blockchain');
     } catch (err: any) {
       console.error('Upload error:', err);
-      setStatus('Upload error: ' + (err.response?.data?.detail || err.message || String(err)));
+
+      if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
+        setStatus('Upload cancelled by user');
+      } else if (err.message?.includes('insufficient funds')) {
+        setStatus('Upload failed: not enough ETH for gas');
+      } else {
+        setStatus('Upload error: ' + (err.response?.data?.detail || err.message || String(err)));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -138,7 +128,7 @@ export const FileManager: React.FC = () => {
       setFiles(resp.data);
     } catch (e) {
       console.error('Fetch files error:', e);
-      setStatus(' Fetch files error');
+      setStatus('Fetch files error');
     }
   };
 
@@ -147,7 +137,6 @@ export const FileManager: React.FC = () => {
       setStatus('Downloading encrypted file...');
 
       const isNewFile = f.ipfsCid === files[files.length - 1]?.ipfsCid;
-
       if (!isNewFile) {
         const hashOk = await verifyFileOnChain(f.originalFileHash);
         if (!hashOk) throw new Error('File hash mismatch. Cannot download.');
@@ -166,8 +155,6 @@ export const FileManager: React.FC = () => {
           .split('')
           .map((c) => c.charCodeAt(0))
       );
-      if (ivBytes.byteLength !== 12) throw new Error(`Invalid IV length: ${ivBytes.byteLength}`);
-
       const encryptedBuf = base64ToArrayBuffer(encryptedFileData);
 
       setStatus('Decrypting file...');
@@ -213,8 +200,7 @@ export const FileManager: React.FC = () => {
           onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
         />
         <button className="upload-button" type="button">
-          <UploadIcon />
-          Upload File
+          <UploadIcon /> Upload File
         </button>
         <p className="upload-prompt">or drag and drop your file here</p>
       </div>
