@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { addFileOnChain, verifyFileOnChain } from '../Blockchain';
+import { addFileOnChain, ensureSepoliaNetwork, verifyFileOnChain } from '../Blockchain';
 import UploadIcon from '../../assets/icons/UploadIcon';
 import FoxIcon from '../../assets/icons/FoxIcon.svg';
 import FileIcon from '../../assets/icons/FileIconn.svg';
@@ -67,6 +67,8 @@ export const FileManager: React.FC = () => {
     try {
       setIsLoading(true);
       setStatus('Encrypting file and generating hash...');
+
+      await ensureSepoliaNetwork();
 
       const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
       const iv = crypto.getRandomValues(new Uint8Array(12));

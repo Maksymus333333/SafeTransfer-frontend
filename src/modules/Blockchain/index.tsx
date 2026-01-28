@@ -43,6 +43,41 @@ const CONTRACT_ABI = [
   },
 ];
 
+export const SEPILIA_CHAIN_ID = '0xaa36a7';
+export const SEPILIA_PARAMS = {
+  chainId: SEPILIA_CHAIN_ID,
+  chainName: 'Sepolia Test Network',
+  nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
+  rpcUrls: ['https://rpc.sepolia.org'],
+  blockExplorerUrls: ['https://sepolia.etherscan.io'],
+};
+
+export const ensureSepoliaNetwork = async () => {
+  if (!window.ethereum) throw new Error('MetaMask not found');
+
+  const chainIdHex = (await window.ethereum.request({ method: 'eth_chainId' })) as string;
+  if (chainIdHex !== SEPILIA_CHAIN_ID) {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: SEPILIA_CHAIN_ID }],
+      });
+      console.log('Switched to Sepolia network');
+    } catch (switchError: any) {
+      // Якщо мережі немає в MetaMask
+      if (switchError.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [SEPILIA_PARAMS],
+        });
+        console.log('Sepolia network added');
+      } else {
+        throw new Error('User rejected network switch');
+      }
+    }
+  }
+};
+
 export const getProvider = () => {
   if (!window.ethereum) throw new Error('MetaMask not found');
   return new BrowserProvider(window.ethereum);
