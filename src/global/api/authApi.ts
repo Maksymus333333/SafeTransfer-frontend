@@ -11,7 +11,7 @@ export interface User {
 }
 
 export const getNonce = async (): Promise<NonceResponse> => {
-  const response = await axios.get<NonceResponse>('http://localhost:8000/api/v1/auth/nonce', {
+  const response = await axios.get<NonceResponse>('https://safetransfer.myftp.org/api/v1/auth/nonce', {
     headers: { Accept: 'application/json' },
   });
   return response.data;
@@ -19,7 +19,7 @@ export const getNonce = async (): Promise<NonceResponse> => {
 
 export const verifySiwe = async (message: string, signature: string): Promise<void> => {
   await axios.post(
-    'http://localhost:8000/api/v1/auth/verify-siwe',
+    'https://safetransfer.myftp.org/api/v1/auth/verify-siwe',
     {
       message,
       signature,
@@ -31,7 +31,7 @@ export const verifySiwe = async (message: string, signature: string): Promise<vo
 };
 
 export const getMe = async (): Promise<User> => {
-  const response = await axios.get<User>('http://localhost:8000/api/v1/users/me', {
+  const response = await axios.get<User>('https://safetransfer.myftp.org/api/v1/users/me', {
     withCredentials: true,
   });
   return response.data;

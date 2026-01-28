@@ -11,7 +11,7 @@
   align-items: center;
   width: 100%;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(255 255 255 / 3%);
   text-align: center;
   border-radius: 5px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
@@ -21,7 +21,7 @@
 }
 
 .metamask-title {
-  color: #ffffff;
+  color: #fff;
   font-size: 32px;
 }
 
@@ -38,7 +38,7 @@
   transition:
     background-color 0.3s ease,
     transform 0.12s ease;
-  background-color: #ffffff;
+  background-color: #fff;
   border-radius: 10px;
   cursor: pointer;
   font-size: 18px;

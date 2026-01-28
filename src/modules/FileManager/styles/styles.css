@@ -1,21 +1,21 @@
 .file-manager-container {
-  padding: 40px;
-  max-width: 900px;
   margin: 120px auto;
+  padding: 40px;
+  color: #e6eef5;
   background-color: #1a1a1a;
   border-radius: 16px;
-  color: #e6eef5;
+  max-width: 900px;
 }
 
 .upload-zone {
-  border: 2px dashed #3a3a3a;
-  border-radius: 12px;
   padding: 40px;
+  border: 2px dashed #3a3a3a;
   text-align: center;
-  cursor: pointer;
   transition:
     background-color 0.3s,
     border-color 0.3s;
+  border-radius: 12px;
+  cursor: pointer;
   margin-bottom: 30px;
 }
 
@@ -25,18 +25,18 @@
 }
 
 .upload-button {
-  background-color: #00f5a0;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  padding: 12px 24px;
+  border: none;
+  color: white;
   transition: background-color 0.3s;
+  background-color: #00f5a0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  gap: 10px;
 }
 
 .upload-button:hover {
@@ -44,18 +44,18 @@
 }
 
 .upload-prompt {
-  margin-top: 15px;
   color: #8c8c8c;
   font-size: 14px;
+  margin-top: 15px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background-color: #232323;
   padding: 15px 20px;
+  background-color: #232323;
   border-radius: 10px;
+  gap: 12px;
   margin-bottom: 30px;
 }
 
@@ -66,14 +66,14 @@
 
 .user-info p {
   margin: 0;
-  font-size: 14px;
   color: #a0a0a0;
+  font-size: 14px;
 }
 
 .user-info span {
-  font-weight: bold;
   color: #e0e0e0;
   font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
 }
 
 .file-list-container {
@@ -82,9 +82,9 @@
 
 .file-list-title {
   color: #e0e0e0;
-  margin-bottom: 20px;
-  font-size: 22px;
   border-bottom: 1px solid #3a3a3a;
+  font-size: 22px;
+  margin-bottom: 20px;
   padding-bottom: 10px;
 }
 
@@ -97,10 +97,10 @@
 .file-item {
   display: flex;
   align-items: center;
-  background-color: #232323;
   padding: 15px;
-  border-radius: 8px;
   transition: background-color 0.3s;
+  background-color: #232323;
+  border-radius: 8px;
 }
 
 .file-item:hover {
@@ -114,20 +114,20 @@
 }
 
 .file-name {
-  flex-grow: 1;
   color: #c0c0c0;
+  flex-grow: 1;
   font-size: 16px;
 }
 
 .download-button {
-  background-color: #3a3a3a;
-  color: #e0e0e0;
-  border: none;
-  border-radius: 6px;
   padding: 8px 16px;
-  font-size: 14px;
-  cursor: pointer;
+  border: none;
+  color: #e0e0e0;
   transition: background-color 0.3s;
+  background-color: #3a3a3a;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .download-button:hover {
@@ -135,7 +135,7 @@
 }
 
 .status-message {
-  margin-top: 20px;
-  text-align: center;
   color: #8c8c8c;
+  text-align: center;
+  margin-top: 20px;
 }

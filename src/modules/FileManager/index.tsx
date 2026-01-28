@@ -104,7 +104,7 @@ export const FileManager: React.FC = () => {
       const exportedKey = await crypto.subtle.exportKey('raw', aesKey);
       form.append('encrypted_aes_key', arrayBufferToBase64(exportedKey));
 
-      const resp = await axios.post('http://localhost:8000/api/v1/files/upload', form, {
+      const resp = await axios.post('https://safetransfer.myftp.org/api/v1/files/upload', form, {
         withCredentials: true,
         headers: { Accept: 'application/json' },
       });
@@ -125,7 +125,9 @@ export const FileManager: React.FC = () => {
 
   const fetchMyFiles = async () => {
     try {
-      const resp = await axios.get<FileInfo[]>('http://localhost:8000/api/v1/files/my', { withCredentials: true });
+      const resp = await axios.get<FileInfo[]>('https://safetransfer.myftp.org/api/v1/files/my', {
+        withCredentials: true,
+      });
       setFiles(resp.data);
     } catch (e) {
       console.error('Fetch files error:', e);
@@ -144,7 +146,7 @@ export const FileManager: React.FC = () => {
         if (!hashOk) throw new Error('❌ File hash mismatch. Cannot download.');
       }
 
-      const resp = await axios.get(`http://localhost:8000/api/v1/files/${f.fileId}/download-info`, {
+      const resp = await axios.get(`https://safetransfer.myftp.org/api/v1/files/${f.fileId}/download-info`, {
         withCredentials: true,
       });
       const { encryptedFileData, encryptedAesKey, iv } = resp.data;
