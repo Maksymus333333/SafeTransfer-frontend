@@ -73,7 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    // need to creat api logout
     setUser(null);
     navigate('/');
   };
@@ -81,11 +80,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const user: User = await getMe(); //   HttpOnly cookie
+        const user: User = await getMe();
         setUser(user);
-      } catch {
-        /* empty */
-      }
+      } catch {/* empty */}
     };
 
     checkAuth();

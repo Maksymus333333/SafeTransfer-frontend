@@ -1,4 +1,5 @@
-import { BrowserProvider, JsonRpcSigner, Contract } from 'ethers';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { BrowserProvider, Contract } from 'ethers';
 
 const CONTRACT_ADDRESS = '0x55EE4E217290854c3285a6725C97748c04Ee3246';
 const CONTRACT_ABI = [
@@ -40,35 +41,35 @@ const CONTRACT_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  {
-    inputs: [
-      { internalType: 'address', name: '', type: 'address' },
-      { internalType: 'uint256', name: '', type: 'uint256' },
-    ],
-    name: 'userFiles',
-    outputs: [
-      { internalType: 'string', name: 'ipfsCid', type: 'string' },
-      { internalType: 'bytes32', name: 'originalFileHash', type: 'bytes32' },
-      { internalType: 'uint256', name: 'timestamp', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
 ];
 
-// Підключення до MetaMask
-export const getProvider = (): BrowserProvider => {
-  if (!window.ethereum) throw new Error('MetaMask not installed');
+export const getProvider = () => {
+  if (!window.ethereum) throw new Error('MetaMask not found');
   return new BrowserProvider(window.ethereum);
 };
 
-// Повертає JsonRpcSigner
-export const getSigner = async (): Promise<JsonRpcSigner> => {
+export const getSigner = async () => {
   const provider = getProvider();
-  return provider.getSigner();
+  return await provider.getSigner();
 };
 
-// Повертає контракт (можна передати signer або provider)
-export const getContract = (runner: JsonRpcSigner | BrowserProvider): Contract => {
-  return new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, runner);
+export const getContract = (signerOrProvider: any) => {
+  return new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signerOrProvider);
+};
+
+export const addFileOnChain = async (ipfsCid: string, fileHashHex: string) => {
+  const signer = await getSigner();
+  const contract = getContract(signer);
+  const tx = await contract.addFile(ipfsCid, '0x' + fileHashHex);
+  await tx.wait();
+  return tx.hash;
+};
+
+export const verifyFileOnChain = async (fileHashHex: string) => {
+  const provider = getProvider();
+  const signer = await provider.getSigner();
+  const address = await signer.getAddress();
+  const contract = getContract(provider);
+  const records = await contract.getFilesByOwner(address);
+  return records.some((r: any) => r.originalFileHash === '0x' + fileHashHex);
 };
