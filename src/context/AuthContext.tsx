@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { getMe, User, getNonce, verifySiwe } from '../global/api/authApi';
+import { getMe, User, getNonce, verifySiwe, logoutApi } from '../global/api/authApi';
 import { useNavigate } from 'react-router-dom';
 import { SiweMessage } from 'siwe';
 import { getAddress } from 'ethers';
@@ -72,9 +72,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    navigate('/');
+  const logout = async () => {
+    try {
+      await logoutApi();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      navigate('/');
+    }
   };
 
   useEffect(() => {

@@ -30,6 +30,10 @@ export const verifySiwe = async (message: string, signature: string): Promise<vo
   );
 };
 
+export const logoutApi = async (): Promise<void> => {
+  await axios.post('https://safetransfer.myftp.org/api/v1/auth/logout', {}, { withCredentials: true });
+};
+
 export const getMe = async (): Promise<User> => {
   const response = await axios.get<User>('https://safetransfer.myftp.org/api/v1/users/me', {
     withCredentials: true,
