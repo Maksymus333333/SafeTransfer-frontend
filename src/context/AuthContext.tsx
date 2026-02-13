@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { getMe, User, getNonce, verifySiwe, logoutApi } from '../global/api/authApi';
 import { useNavigate } from 'react-router-dom';

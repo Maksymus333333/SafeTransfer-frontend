@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { BrowserProvider, Contract } from 'ethers';
 
 const CONTRACT_ADDRESS = '0x55EE4E217290854c3285a6725C97748c04Ee3246';
@@ -64,7 +63,6 @@ export const ensureSepoliaNetwork = async () => {
       });
       console.log('Switched to Sepolia network');
     } catch (switchError: any) {
-      // Якщо мережі немає в MetaMask
       if (switchError.code === 4902) {
         await window.ethereum.request({
           method: 'wallet_addEthereumChain',
@@ -83,6 +81,11 @@ export const getProvider = () => {
   return new BrowserProvider(window.ethereum);
 };
 
+export const getReadonlyProvider = () => {
+  if (!window.ethereum) throw new Error('MetaMask not found');
+  return new BrowserProvider(window.ethereum);
+};
+
 export const getSigner = async () => {
   const provider = getProvider();
   return await provider.getSigner();
@@ -96,7 +99,6 @@ export const addFileOnChain = async (ipfsCid: string, fileHashHex: string) => {
   const signer = await getSigner();
   const contract = getContract(signer);
   const tx = await contract.addFile(ipfsCid, '0x' + fileHashHex);
-  await tx.wait();
   return tx.hash;
 };
 

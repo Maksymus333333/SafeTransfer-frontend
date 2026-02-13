@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { addFileOnChain, ensureSepoliaNetwork, verifyFileOnChain } from '../Blockchain';
+import { addFileOnChain, ensureSepoliaNetwork, getProvider, verifyFileOnChain } from '../Blockchain';
 import UploadIcon from '../../assets/icons/UploadIcon';
 import FoxIcon from '../../assets/icons/FoxIcon.svg';
 import FileIcon from '../../assets/icons/FileIconn.svg';
 import './styles/styles.css';
+import { waitForTxConfirmation } from '../WaitForTx';
 
 interface FileInfo {
   fileId: string;
@@ -83,7 +83,17 @@ export const FileManager: React.FC = () => {
 
       setStatus('Submitting transaction to blockchain...');
 
-      await addFileOnChain(fileHashHex, fileHashHex);
+      setStatus('Confirm transaction in MetaMask...');
+
+      const txHash = await addFileOnChain(fileHashHex, fileHashHex);
+
+      setStatus('Transaction sent. Waiting for blockchain confirmation...');
+
+      const provider = getProvider();
+
+      await waitForTxConfirmation(provider, txHash, setStatus);
+
+      setStatus('Transaction confirmed. Uploading file to server...');
 
       setStatus('Transaction confirmed. Uploading file to server...');
       const form = new FormData();
