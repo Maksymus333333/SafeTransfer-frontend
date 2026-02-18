@@ -14,11 +14,11 @@ export const waitForTxConfirmation = async (
 
     if (receipt) {
       if (receipt.status === 1) {
-        onStatus?.('Transaction confirmed on blockchain ✅');
+        onStatus?.('Transaction confirmed on blockchain');
         return receipt;
       }
 
-      throw new Error('Transaction reverted ❌');
+      throw new Error('Transaction reverted');
     }
 
     await new Promise((r) => setTimeout(r, interval));

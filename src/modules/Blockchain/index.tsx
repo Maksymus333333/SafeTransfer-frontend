@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract } from 'ethers';
+import { BrowserProvider, Contract, Signer } from 'ethers';
 
 const CONTRACT_ADDRESS = '0x55EE4E217290854c3285a6725C97748c04Ee3246';
 const CONTRACT_ABI = [
@@ -43,12 +43,33 @@ const CONTRACT_ABI = [
 ];
 
 export const SEPILIA_CHAIN_ID = '0xaa36a7';
+export const SEPILIA_CHAIN_ID_DEC = 11155111;
+
 export const SEPILIA_PARAMS = {
   chainId: SEPILIA_CHAIN_ID,
   chainName: 'Sepolia Test Network',
   nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
   rpcUrls: ['https://rpc.sepolia.org'],
   blockExplorerUrls: ['https://sepolia.etherscan.io'],
+};
+
+// --- EIP-712 Configuration for Key Generation ---
+const EIP712_DOMAIN = {
+  name: 'SafeTransfer',
+  version: '1',
+  chainId: SEPILIA_CHAIN_ID_DEC,
+};
+
+const EIP712_TYPES = {
+  Auth: [
+    { name: 'action', type: 'string' },
+    { name: 'info', type: 'string' },
+  ],
+};
+
+const EIP712_VALUE = {
+  action: 'Access Files',
+  info: 'Sign this message to generate your encryption key. This does not trigger a transaction.',
 };
 
 export const ensureSepoliaNetwork = async () => {
@@ -109,4 +130,13 @@ export const verifyFileOnChain = async (fileHashHex: string) => {
   const contract = getContract(provider);
   const records = await contract.getFilesByOwner(address);
   return records.some((r: any) => r.originalFileHash === '0x' + fileHashHex);
+};
+
+export const getWalletEncryptionKey = async (signer: Signer): Promise<CryptoKey> => {
+  const signature = await signer.signTypedData(EIP712_DOMAIN, EIP712_TYPES, EIP712_VALUE);
+
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.digest('SHA-256', encoder.encode(signature));
+
+  return await crypto.subtle.importKey('raw', keyMaterial, 'AES-GCM', false, ['encrypt', 'decrypt']);
 };

@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const user: User = await getMe();
         setUser(user);
       } catch {
-        /* empty */
+        // Silent fail: user is not logged in
       }
     };
 

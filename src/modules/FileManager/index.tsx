@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
-import { addFileOnChain, ensureSepoliaNetwork, getProvider, verifyFileOnChain } from '../Blockchain';
+import {
+  addFileOnChain,
+  ensureSepoliaNetwork,
+  getProvider,
+  verifyFileOnChain,
+  getSigner,
+  getWalletEncryptionKey,
+} from '../Blockchain';
 import UploadIcon from '../../assets/icons/UploadIcon';
 import FoxIcon from '../../assets/icons/FoxIcon.svg';
 import FileIcon from '../../assets/icons/FileIconn.svg';
@@ -16,6 +23,8 @@ interface FileInfo {
   contentType?: string;
 }
 
+// --- Helper Functions ---
+
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -29,6 +38,14 @@ const base64ToArrayBuffer = (base64: string) => {
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
+};
+
+// З'єднує два масиви (IV + EncryptedData)
+const concatenateBuffers = (buffer1: ArrayBuffer, buffer2: ArrayBuffer) => {
+  const tmp = new Uint8Array(buffer1.byteLength + buffer2.byteLength);
+  tmp.set(new Uint8Array(buffer1), 0);
+  tmp.set(new Uint8Array(buffer2), buffer1.byteLength);
+  return tmp.buffer;
 };
 
 export const FileManager: React.FC = () => {
@@ -47,6 +64,7 @@ export const FileManager: React.FC = () => {
     if (file) uploadFile(file);
   };
 
+  // --- Drag & Drop Handlers ---
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -66,44 +84,51 @@ export const FileManager: React.FC = () => {
   const uploadFile = async (file: File) => {
     try {
       setIsLoading(true);
-      setStatus('Encrypting file and generating hash...');
+      setStatus('Initializing encryption...');
 
       await ensureSepoliaNetwork();
 
-      const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
-      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const fileKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 
+      setStatus('Encrypting file locally...');
+      const fileIv = crypto.getRandomValues(new Uint8Array(12));
       const fileData = await file.arrayBuffer();
-      const encryptedBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, fileData);
+      const encryptedFileBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: fileIv }, fileKey, fileData);
 
       const hashBuf = await crypto.subtle.digest('SHA-256', fileData);
       const fileHashHex = Array.from(new Uint8Array(hashBuf))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
 
+      setStatus('Please sign in MetaMask to secure your file key...');
+      const signer = await getSigner();
+      const walletKey = await getWalletEncryptionKey(signer);
+
+      setStatus('Securing file key...');
+      const rawFileKey = await crypto.subtle.exportKey('raw', fileKey);
+      const keyIv = crypto.getRandomValues(new Uint8Array(12));
+
+      const encryptedKeyBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: keyIv }, walletKey, rawFileKey);
+
+      const combinedKeyData = concatenateBuffers(keyIv.buffer, encryptedKeyBuf);
+
       setStatus('Submitting transaction to blockchain...');
-
-      setStatus('Confirm transaction in MetaMask...');
-
       const txHash = await addFileOnChain(fileHashHex, fileHashHex);
 
-      setStatus('Transaction sent. Waiting for blockchain confirmation...');
-
+      setStatus('Transaction sent. Waiting for confirmation...');
       const provider = getProvider();
-
       await waitForTxConfirmation(provider, txHash, setStatus);
 
-      setStatus('Transaction confirmed. Uploading file to server...');
-
-      setStatus('Transaction confirmed. Uploading file to server...');
+      setStatus('Transaction confirmed. Uploading encrypted data...');
       const form = new FormData();
-      form.append('encrypted_file', new Blob([encryptedBuf], { type: file.type }), file.name);
+
+      form.append('encrypted_file', new Blob([encryptedFileBuf], { type: file.type }), file.name);
       form.append('file_type', file.type);
-      form.append('iv', btoa(String.fromCharCode(...iv)));
       form.append('original_file_hash', fileHashHex);
 
-      const exportedKey = await crypto.subtle.exportKey('raw', aesKey);
-      form.append('encrypted_aes_key', arrayBufferToBase64(exportedKey));
+      form.append('iv', arrayBufferToBase64(fileIv.buffer));
+
+      form.append('encrypted_aes_key', arrayBufferToBase64(combinedKeyData));
 
       await axios.post('https://safetransfer.myftp.org/api/v1/files/upload', form, {
         withCredentials: true,
@@ -116,16 +141,15 @@ export const FileManager: React.FC = () => {
       const lastFile = resp.data[resp.data.length - 1];
       setFiles((prev) => [...prev, lastFile]);
 
-      setStatus('File successfully uploaded and registered on blockchain');
+      setStatus('Success! File uploaded and secured.');
     } catch (err: any) {
       console.error('Upload error:', err);
-
       if (err.code === 4001 || err.code === 'ACTION_REJECTED') {
-        setStatus('Upload cancelled by user');
+        setStatus('Operation cancelled by user');
       } else if (err.message?.includes('insufficient funds')) {
-        setStatus('Upload failed: not enough ETH for gas');
+        setStatus('Failed: not enough ETH for gas');
       } else {
-        setStatus('Upload error: ' + (err.response?.data?.detail || err.message || String(err)));
+        setStatus('Error: ' + (err.response?.data?.detail || err.message || String(err)));
       }
     } finally {
       setIsLoading(false);
@@ -140,18 +164,19 @@ export const FileManager: React.FC = () => {
       setFiles(resp.data);
     } catch (e) {
       console.error('Fetch files error:', e);
-      setStatus('Fetch files error');
+      setStatus('Failed to load files');
     }
   };
 
   const downloadAndDecrypt = async (f: FileInfo) => {
     try {
-      setStatus('Downloading encrypted file...');
+      setIsLoading(true);
+      setStatus('Downloading encrypted data...');
 
       const isNewFile = f.ipfsCid === files[files.length - 1]?.ipfsCid;
       if (!isNewFile) {
         const hashOk = await verifyFileOnChain(f.originalFileHash);
-        if (!hashOk) throw new Error('File hash mismatch. Cannot download.');
+        if (!hashOk) throw new Error('Integrity check failed: Blockchain hash mismatch.');
       }
 
       const resp = await axios.get(`https://safetransfer.myftp.org/api/v1/files/${f.fileId}/download-info`, {
@@ -159,18 +184,31 @@ export const FileManager: React.FC = () => {
       });
       const { encryptedFileData, encryptedAesKey, iv } = resp.data;
 
-      const rawKeyBuf = base64ToArrayBuffer(encryptedAesKey);
-      const aesKey = await crypto.subtle.importKey('raw', rawKeyBuf, 'AES-GCM', false, ['decrypt']);
+      setStatus('Please sign to unlock encryption key...');
+      const signer = await getSigner();
+      const walletKey = await getWalletEncryptionKey(signer);
 
-      const ivBytes = new Uint8Array(
+      const combinedKeyData = base64ToArrayBuffer(encryptedAesKey);
+      const keyIv = combinedKeyData.slice(0, 12);
+      const encryptedKeyCipher = combinedKeyData.slice(12);
+
+      setStatus('Decrypting file key...');
+      const rawFileKey = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: keyIv }, walletKey, encryptedKeyCipher);
+      const fileKey = await crypto.subtle.importKey('raw', rawFileKey, 'AES-GCM', false, ['decrypt']);
+
+      setStatus('Decrypting file content...');
+      const fileIvBytes = new Uint8Array(
         atob(iv)
           .split('')
           .map((c) => c.charCodeAt(0))
       );
-      const encryptedBuf = base64ToArrayBuffer(encryptedFileData);
+      const encryptedFileBytes = base64ToArrayBuffer(encryptedFileData);
 
-      setStatus('Decrypting file...');
-      const decryptedBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, aesKey, encryptedBuf);
+      const decryptedBuf = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: fileIvBytes },
+        fileKey,
+        encryptedFileBytes
+      );
 
       const blob = new Blob([decryptedBuf], { type: f.contentType ?? 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
@@ -180,10 +218,14 @@ export const FileManager: React.FC = () => {
       a.click();
       URL.revokeObjectURL(url);
 
-      setStatus('File decrypted and downloaded');
+      setStatus('File successfully decrypted and downloaded');
     } catch (err: any) {
       console.error(err);
-      setStatus('Download error: ' + (err.response?.data?.detail || err.message || String(err)));
+      setStatus(
+        'Decryption error: ' + (err.response?.data?.detail || err.message || 'Signature mismatch or data corrupted')
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -212,7 +254,7 @@ export const FileManager: React.FC = () => {
           onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
         />
         <button className="upload-button" type="button">
-          <UploadIcon /> Upload File
+          <UploadIcon /> Upload Secure File
         </button>
         <p className="upload-prompt">or drag and drop your file here</p>
       </div>
@@ -240,7 +282,7 @@ export const FileManager: React.FC = () => {
                 <img src={FileIcon} alt="file" className="file-icon" />
                 <span className="file-name">{f.filename || f.ipfsCid}</span>
                 <button className="download-button" onClick={() => downloadAndDecrypt(f)}>
-                  Download
+                  Download & Decrypt
                 </button>
               </div>
             ))
