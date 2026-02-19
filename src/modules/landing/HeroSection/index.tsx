@@ -1,9 +1,10 @@
 import React from 'react';
 import './styles/styles.css';
-import { useAuth } from '../../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export const HeroSection: React.FC = () => {
-  const { login } = useAuth();
+  const navigate = useNavigate();
+  const handleLoginClick = () => navigate('/login');
   return (
     <section className="hero-hero">
       <div className="hero-inner">
@@ -17,7 +18,7 @@ export const HeroSection: React.FC = () => {
               Securely store and share files with end‑to‑end encryption — connect your MetaMask wallet to begin.
             </p>
             <div className="hero-cta">
-              <button className="cta-button" onClick={login}>
+              <button className="cta-button" onClick={handleLoginClick}>
                 Get started
               </button>
             </div>
